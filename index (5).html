@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pour toi</title>
+<style>
+:root{--bg:#07040a;--fg:#fff;--red:#e11d48;--glow:rgba(225,29,72,.55);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#07040a;--fg:#fff}}
+:root[data-theme="dark"]{--bg:#07040a;--fg:#fff}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:Georgia,"Times New Roman",serif;overflow:hidden}
+#glow{position:fixed;inset:0;background:radial-gradient(circle at 50% 50%,var(--glow),transparent 60%);opacity:0;transition:opacity 2s}
+#glow.on{opacity:1}
+#intro{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;text-align:center;transition:opacity .8s}
+#intro h1{font-weight:400;font-size:clamp(22px,6vw,34px);margin:0}
+#intro input{width:min(320px,80vw);padding:14px 16px;font:inherit;font-size:20px;text-align:center;color:var(--fg);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.3);border-radius:12px;outline:none}
+#intro input:focus{border-color:var(--red)}
+#intro button{padding:12px 30px;font:inherit;font-size:18px;color:#fff;background:var(--red);border:0;border-radius:999px;cursor:pointer}
+#intro button:disabled{opacity:.4;cursor:default}
+#res{display:flex;flex-direction:column;gap:10px;align-items:center;width:100%}#res[hidden]{display:none}#res p{margin:0;font-size:16px;opacity:.85}#lnk{font-size:14px!important;width:min(420px,90vw)!important}.row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}#intro button.alt{background:transparent;border:1px solid rgba(255,255,255,.4)}
+#stage{position:fixed;inset:0;display:none}
+#heart{position:absolute;left:50%;top:50%;width:0;height:0}
+#heart.beat{animation:beat 1.4s ease-in-out infinite}
+@keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.04)}30%{transform:scale(1)}45%{transform:scale(1.03)}}
+.t{position:absolute;left:0;top:0;white-space:nowrap;font-family:Helvetica,Arial,sans-serif;font-weight:700;padding:1px 4px;border-radius:2px;opacity:0;transition:transform 1.6s cubic-bezier(.2,.8,.2,1),opacity .8s}
+#name{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(.8);font-size:clamp(34px,10vw,64px);text-shadow:0 0 18px #000,0 0 6px #000;opacity:0;transition:opacity 1.5s,transform 1.5s;z-index:5;max-width:90vw;text-align:center;overflow-wrap:anywhere}
+#name.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+</style>
+</head>
+<body>
+<div id="glow"></div>
+
+<div id="intro">
+  <h1>Écris le prénom de ta copine</h1>
+  <input id="inp" type="text" maxlength="20" placeholder="Son prénom" autocomplete="off">
+  <button id="go" disabled>Créer le lien</button>
+  <div id="res" hidden>
+    <p>Voilà son lien, envoie-le-lui :</p>
+    <input id="lnk" type="text" readonly>
+    <div class="row"><button id="cp">Copier le lien</button><button id="pv" class="alt">Aperçu</button></div>
+  </div>
+</div>
+
+<div id="stage"><div id="heart"></div><div id="name"></div></div>
+
+<script>
+(function(){
+  var BASE='';
+  var inp=document.getElementById('inp'),go=document.getElementById('go'),res=document.getElementById('res'),lnk=document.getElementById('lnk');
+  var started=false;
+  function enc(t){return btoa(unescape(encodeURIComponent(t))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+  function dec(h){try{h=h.replace(/-/g,'+').replace(/_/g,'/');while(h.length%4)h+='=';return decodeURIComponent(escape(atob(h)))}catch(e){return ''}}
+  function fromHash(){var h=(location.hash||'').slice(1);return h?dec(h).trim():''}
+  inp.addEventListener('input',function(){go.disabled=!inp.value.trim();res.hidden=true});
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'&&inp.value.trim())make()});
+  go.addEventListener('click',make);
+  function make(){
+    var n=inp.value.trim();if(!n)return;
+    lnk.value=(BASE||location.href.split('#')[0])+'#'+enc(n);
+    res.hidden=false;
+  }
+  document.getElementById('cp').addEventListener('click',function(){
+    var b=this;
+    function ok(){b.textContent='Copié ✓';setTimeout(function(){b.textContent='Copier le lien'},1800)}
+    try{navigator.clipboard.writeText(lnk.value).then(ok,function(){lnk.select();document.execCommand('copy');ok()})}
+    catch(e){lnk.select();try{document.execCommand('copy')}catch(x){}ok()}
+  });
+  document.getElementById('pv').addEventListener('click',function(){run(inp.value.trim())});
+  window.addEventListener('hashchange',function(){var n=fromHash();if(n)run(n)});
+  var given=fromHash();
+  if(given)run(given);
+
+  function heartX(t){return 16*Math.pow(Math.sin(t),3)}
+  function heartY(t){return -(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))}
+  function inside(x,y){ // x,y in heart units, test via polar-ish sampling of outline
+    var px=x/16,py=-y/16;
+    var a=px*px+py*py-1;
+    return a*a*a-px*px*py*py*py<=0;
+  }
+
+  function run(n){
+    if(started||!n)return;
+    started=true;
+    document.getElementById('intro').style.opacity=0;
+    setTimeout(function(){document.getElementById('intro').style.display='none'},800);
+    var stage=document.getElementById('stage');stage.style.display='block';
+    document.getElementById('glow').classList.add('on');
+    var nm=document.getElementById('name');nm.textContent=n;
+    setTimeout(function(){nm.classList.add('on')},600);
+    setTimeout(function(){build(n)},2200);
+  }
+
+  function build(){
+    var heart=document.getElementById('heart');
+    var W=Math.min(window.innerWidth,window.innerHeight*0.95);
+    var scale=W/40; // px per heart unit
+    var tags=[],tries=0,N=260;
+    while(tags.length<N&&tries<20000){
+      tries++;
+      var x=(Math.random()*36-18),y=(Math.random()*34-17);
+      if(inside(x,y))tags.push([x,y]);
+    }
+    // sort so centre fills first
+    tags.sort(function(a,b){return Math.hypot(a[0],a[1])-Math.hypot(b[0],b[1])});
+    var cols=[['#fff','#e11d48'],['#fff','#be123c'],['#e11d48','#fff'],['#fb7185','#4c0519'],['#fff','#9f1239']];
+    tags.forEach(function(p,i){
+      var el=document.createElement('div');el.className='t';el.textContent='I love you';
+      var c=cols[Math.floor(Math.random()*cols.length)];
+      el.style.color=c[0];el.style.background=c[1];
+      var fs=Math.max(9,Math.round(scale*(0.55+Math.random()*0.5)));
+      el.style.fontSize=fs+'px';
+      var rot=(Math.random()*70-35);
+      var tx=p[0]*scale,ty=(p[1]+1)*scale;
+      var sx=(Math.random()-.5)*60,sy=(Math.random()-.5)*60;
+      el.style.transform='translate('+sx+'px,'+sy+'px) scale(.2) rotate(0deg)';
+      el.style.transitionDelay=(i*0.012)+'s';
+      el.style.marginLeft='-2.4em';el.style.marginTop='-.6em';
+      heart.appendChild(el);
+      el._f='translate('+tx+'px,'+ty+'px) scale(1) rotate('+rot+'deg)';
+    });
+    heart.offsetHeight;
+    Array.prototype.forEach.call(heart.children,function(el){el.style.opacity=1;el.style.transform=el._f});
+    setTimeout(function(){heart.classList.add('beat')},4800);
+  }
+})();
+</script>
+</body>
+</html>
